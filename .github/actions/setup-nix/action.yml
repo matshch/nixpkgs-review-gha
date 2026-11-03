@@ -30,6 +30,21 @@ runs:
       with:
         hatchet-protocol: rampage
 
+    # The riscv64 bootstrap gcc is a non-PIE executable linked at 0x10000.
+    # Patching it while unpacking bootstrap-tools moves its first segment to
+    # 0xf000, which is below Ubuntu's default vm.mmap_min_addr (65536), so gcc
+    # segfaults immediately and nothing can be built from source.
+    # Remove once nixpkgs ships PIE bootstrap tools:
+    # https://github.com/NixOS/nixpkgs/issues/460825
+    # https://github.com/NixOS/nixpkgs/pull/514892
+    - name: lower vm.mmap_min_addr (riscv64)
+      if: runner.os == 'Linux' && inputs.system == 'riscv64-linux'
+      shell: bash
+      run: |
+        echo "vm.mmap_min_addr was $(sysctl -n vm.mmap_min_addr)"
+        sudo sysctl -w vm.mmap_min_addr=4096 \
+          || echo "::warning::could not lower vm.mmap_min_addr, building the riscv64 stdenv from source will fail"
+
     - name: reclaim space (darwin)
       if: runner.os == 'macOS'
       shell: bash
